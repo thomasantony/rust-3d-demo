@@ -2,6 +2,9 @@ use wasm_bindgen::prelude::*;
 use web_sys::WebGlRenderingContext as GL;
 
 mod gl_setup;
+mod shaders;
+mod programs;
+mod common_funcs;
 
 #[wasm_bindgen]
 extern "C" {
