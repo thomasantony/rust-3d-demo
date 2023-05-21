@@ -1,3 +1,4 @@
+use nalgebra::Perspective3;
 use web_sys::WebGlRenderingContext as GL;
 use web_sys::*;
 
@@ -108,3 +109,110 @@ pub fn mult_matrix_4(a: [f32; 16], b: [f32; 16]) -> [f32; 16]
 
     return_var
 }
+
+pub fn get_position_grid_n_by_n(n: usize) -> (Vec<f32>, Vec<u16>)
+{
+    let n_plus_one = n + 1;
+    // X, Y, Z
+    // Make it more efficient by storing just x and z and computing y on the fly
+    let mut positions: Vec<f32> = vec![0.; n_plus_one * n_plus_one * 3];
+    let mut indices: Vec<u16> = vec![0; n * n * 6]; // 3 vertices per triangle, 2 triangles per square = 6 indices per square
+ 
+    // WebGL display goes from -1 to 1, so the "width" is equal to 2
+    let graph_layout_width: f32 = 2.;
+
+    let square_size: f32 = graph_layout_width / (n as f32);
+
+    for i in 0..n_plus_one {
+        for j in 0..n_plus_one {
+            // Convert from 2D to 1D array, * 3 to account for X, Y, Z
+            // i,j coordinates are grid-cell positions. We store x,y,z coordinates for each vertex in the grid
+            let start_pos = (i * n_plus_one + j) * 3; 
+            positions[start_pos] = -1. + (j as f32) * square_size;
+            positions[start_pos + 1] = 0.;
+            positions[start_pos + 2] = -1. + (i as f32) * square_size; 
+
+            // Don't add indices for the last row or column
+            if i < n && j < n
+            {
+                let top_left = (i * n_plus_one + j) as u16;
+                let bottom_left = top_left + n_plus_one as u16;
+
+                let top_right = top_left + 1; // they are stored in a row-major order
+                let bottom_right = bottom_left + 1;
+
+                // Define counter-clockwise winding order vertices
+                // for the two triangles that make up a square
+                indices[(i * n + j) * 6] = top_left;
+                indices[(i * n + j) * 6 + 1] = bottom_left;
+                indices[(i * n + j) * 6 + 2] = top_right;
+
+                indices[(i * n + j) * 6 + 3] = top_right;
+                indices[(i * n + j) * 6 + 4] = bottom_left;
+                indices[(i * n + j) * 6 + 5] = bottom_right;
+            }
+        }
+    }
+    (positions, indices)
+}
+
+pub fn get_3d_projection_matrix(bottom: f32,
+    top:f32,
+    left: f32,
+    right: f32,
+    canvas_height: f32,
+    canvas_width: f32,
+    rotation_angle_x_axis: f32, rotation_angle_y_axis: f32)
+ -> [f32; 16]
+ {
+    const FIELD_OF_VIEW: f32 = 45. * std::f32::consts::PI / 180.; // in radians
+    const Z_NEAR: f32 = 0.1;
+    const Z_FAR: f32 = 100.0;
+
+    // const Z_PLANE: f32 = -1.0 / (FIELD_OF_VIEW/2.0).tan();
+    const Z_PLANE: f32 = -2.414213562373095;
+
+    let rotate_x_mat : [f32; 16] = [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, rotation_angle_x_axis.cos(), -rotation_angle_x_axis.sin(), 0.0,
+        0.0, rotation_angle_x_axis.sin(), rotation_angle_x_axis.cos(), 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    ];
+    let rotate_y_mat: [f32; 16] = [
+        rotation_angle_y_axis.cos(), 0.0, rotation_angle_y_axis.sin(), 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        -rotation_angle_y_axis.sin(), 0.0, rotation_angle_y_axis.cos(), 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    ];
+    let rotation_matrix = mult_matrix_4(rotate_x_mat, rotate_y_mat);
+
+    let aspect_ratio = canvas_width / canvas_height;
+    let x_range = right - left;
+    let y_range = top - bottom;
+    let scale_x = x_range / canvas_width;
+    let scale_y = y_range / canvas_height;
+    let scale = scale_y;
+
+    let translate_mat = translation_matrix(
+        -1. + scale_x + 2. * left / canvas_width,
+        -1. + scale_y + 2. * bottom / canvas_height,
+        Z_PLANE,
+    );
+
+    let scale_mat = scaling_matrix(
+        scale,
+        scale,
+        0.,
+    );
+    let rotation_scale = mult_matrix_4(rotation_matrix, scale_mat);
+    let combined_transform = mult_matrix_4(rotation_scale, translate_mat);
+    let perspective_mat_tmp: Perspective3<f32> = Perspective3::new(
+        aspect_ratio,
+        FIELD_OF_VIEW,
+        Z_NEAR,
+        Z_FAR,
+    );
+    let mut perspective: [f32; 16] = [0.; 16];
+    perspective.copy_from_slice(perspective_mat_tmp.as_matrix().as_slice());
+    mult_matrix_4(combined_transform, perspective)
+ }

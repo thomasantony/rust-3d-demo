@@ -3,7 +3,6 @@ use web_sys::WebGlRenderingContext as GL;
 use web_sys::*;
 use js_sys::WebAssembly;
 use crate::common_funcs as cf;
-use crate::log;
 
 pub struct Color2DGradient{
     program: WebGlProgram,
@@ -19,7 +18,7 @@ impl Color2DGradient{
     pub fn new(gl: &WebGlRenderingContext) -> Self {
         let program = cf::link_program(gl, 
             crate::shaders::vertex::color_2d_gradient::SHADER, 
-            crate::shaders::fragment::color_2d_gradient::SHADER
+            crate::shaders::fragment::varying_color_from_vertex::SHADER,
         ).unwrap();
 
         // Be more efficient by storing just the indices of the vertices
