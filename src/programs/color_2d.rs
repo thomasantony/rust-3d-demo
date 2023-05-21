@@ -3,7 +3,6 @@ use web_sys::WebGlRenderingContext as GL;
 use web_sys::*;
 use js_sys::WebAssembly;
 use crate::common_funcs as cf;
-use crate::log;
 
 pub struct Color2D{
     program: WebGlProgram,
@@ -77,7 +76,6 @@ impl Color2D{
         );
         gl.uniform1f(Some(&self.u_opacity), 1.0);
 
-        log(&format!("{} {} {} {}", (right - left), (top - bottom), canvas_width, canvas_height));
         let translation_mat = cf::translation_matrix(
             2. * left / canvas_width - 1.,
             2. * bottom / canvas_height - 1.,
