@@ -32,7 +32,7 @@ rust.then(m => {
                 gl.viewport(0, 0, window.innerWidth, window.innerHeight);
             }
             let elapsedTime = currTime - initialTime;
-            rustClient.update(elapsedTime, window.innerWidth, window.innerHeight);
+            rustClient.update(elapsedTime, window.innerHeight, window.innerWidth);
             rustClient.render();
         }
         
