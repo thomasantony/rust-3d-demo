@@ -40,11 +40,12 @@ impl Client {
     pub fn render(&self) -> Result<(), JsValue> {
         self.gl.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
         let curr_state = app_state::get_curr_state();
-        self.program_color_2d.render(&self.gl, 
-            0.,  // bottom
-            100., // top
-            0.,  // left
-            100., // right
+        self.program_color_2d.render(
+            &self.gl,
+            curr_state.control_bottom,
+            curr_state.control_top,
+            curr_state.control_left,
+            curr_state.control_right,
             curr_state.canvas_height,
             curr_state.canvas_width,
         );

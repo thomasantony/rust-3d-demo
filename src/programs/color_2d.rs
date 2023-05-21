@@ -53,9 +53,9 @@ impl Color2D{
     }
 
     pub fn render(&self, gl: &WebGlRenderingContext, 
-        bottom: f32, 
-        top: f32, 
-        left: f32, 
+        bottom: f32,
+        top: f32,
+        left: f32,
         right: f32,
         canvas_height: f32,
         canvas_width: f32
@@ -72,24 +72,26 @@ impl Color2D{
         gl.uniform4f(Some(&self.u_color), 
             0.0, 
             0.5, 
-            0.1, 
+            0.4, 
             1.0
         );
         gl.uniform1f(Some(&self.u_opacity), 1.0);
-        // This is done manually to make it easier to understand
-        let translation_matrix = cf::translation_matrix(
-            2.0 * left / canvas_width - 1.0, // Values between -1 and 1   
-            2.0 * bottom / canvas_height - 1.0, // Values between -1 and 1   
-            0.0
+
+        log(&format!("{} {} {} {}", (right - left), (top - bottom), canvas_width, canvas_height));
+        let translation_mat = cf::translation_matrix(
+            2. * left / canvas_width - 1.,
+            2. * bottom / canvas_height - 1.,
+            0.,
         );
-        let scaling_matrix = cf::scaling_matrix(
+
+        let scale_mat = cf::scaling_matrix(
             2. * (right - left) / canvas_width,
             2. * (top - bottom) / canvas_height,
-            0.0
+            0.,
         );
         // Order of multiplication is important
-        let transform = cf::mult_matrix_4(scaling_matrix, translation_matrix);
-        gl.uniform_matrix4fv_with_f32_array(Some(&self.u_transform), false, &transform);
+        let transform_mat = cf::mult_matrix_4(scale_mat, translation_mat);
+        gl.uniform_matrix4fv_with_f32_array(Some(&self.u_transform), false, &transform_mat);
         gl.draw_arrays(GL::TRIANGLES, 0, (self.rect_vertices_len / 2) as i32);
     }
 }

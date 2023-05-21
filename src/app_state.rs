@@ -7,11 +7,22 @@ lazy_static! {
 }
 
 pub fn update_dynamic_data(time: f32, canvas_height: f32, canvas_width: f32) {
+    let min_height_width = canvas_height.min(canvas_width);
+    let display_size = 0.9 * min_height_width;
+    let half_display_size = display_size / 2.;
+    let half_canvas_height = canvas_height / 2.;
+    let half_canvas_width = canvas_width / 2.;  
+    
+    // Center the display area in canvas
     let mut data = APP_STATE.lock().unwrap();
     *data = Arc::new (AppState {
         time,
         canvas_height,
         canvas_width,
+        control_bottom: half_canvas_height - half_display_size,
+        control_top: half_canvas_height + half_display_size,
+        control_left: half_canvas_width - half_display_size,
+        control_right: half_canvas_width + half_display_size,
         ..*data.clone()
     });
 }
@@ -23,6 +34,10 @@ pub fn get_curr_state() -> Arc<AppState> {
 pub struct AppState {
     pub canvas_height: f32,
     pub canvas_width: f32,
+    pub control_top: f32,
+    pub control_bottom: f32,
+    pub control_left: f32,
+    pub control_right: f32,
     pub time: f32,
 }
 
@@ -31,6 +46,10 @@ impl AppState {
         Self {
             canvas_height: 0.,
             canvas_width: 0.,
+            control_top: 0.,
+            control_bottom: 0.,
+            control_left: 0.,
+            control_right: 0.,
             time: 0.,
         }
     }
