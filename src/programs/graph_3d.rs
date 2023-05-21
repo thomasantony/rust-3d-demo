@@ -3,13 +3,14 @@ use web_sys::WebGlRenderingContext as GL;
 use web_sys::*;
 use js_sys::WebAssembly;
 use crate::common_funcs as cf;
+use crate::constants as c;
 
 pub struct Graph3D {
     program: WebGlProgram,
     indices_buffer: WebGlBuffer,
     index_count: i32,
     position_buffer: WebGlBuffer,
-
+    y_buffer: WebGlBuffer,
     u_opacity: WebGlUniformLocation,
     u_projection : WebGlUniformLocation,
 }
@@ -21,7 +22,7 @@ impl Graph3D {
             crate::shaders::fragment::varying_color_from_vertex::SHADER,
         ).unwrap();
 
-        let (positions, indices) = cf::get_position_grid_n_by_n(10 );
+        let (positions, indices) = cf::get_position_grid_n_by_n(c::GRID_SIZE);
 
         let memory_buffer = wasm_bindgen::memory()
             .dyn_into::<WebAssembly::Memory>()
@@ -55,6 +56,7 @@ impl Graph3D {
             position_buffer,
             indices_buffer,
             index_count: indices_array.length() as i32, 
+            y_buffer: gl.create_buffer().ok_or("failed to create buffer").unwrap(),
         }
     }
     pub fn render(
@@ -68,6 +70,7 @@ impl Graph3D {
         canvas_width: f32,
         rotation_angle_x_axis: f32,
         rotation_angle_y_axis: f32,
+        y_vals: &[f32],
     ) {
         gl.use_program(Some(&self.program));
         let projection_matrix = cf::get_3d_projection_matrix(
@@ -87,6 +90,20 @@ impl Graph3D {
         gl.vertex_attrib_pointer_with_i32(0, 3, GL::FLOAT, false, 0, 0);
         gl.enable_vertex_attrib_array(0);
 
+        gl.bind_buffer(GL::ARRAY_BUFFER, Some(&self.y_buffer));
+        gl.vertex_attrib_pointer_with_i32(1, 1, GL::FLOAT, false, 0, 0);
+        gl.enable_vertex_attrib_array(1);
+        
+        let y_memory_buffer = wasm_bindgen::memory()
+            .dyn_into::<WebAssembly::Memory>()
+            .unwrap()
+            .buffer();
+        let y_location = y_vals.as_ptr() as u32 / 4;
+        let y_array = js_sys::Float32Array::new(&y_memory_buffer).subarray(
+            y_location,
+            y_location + y_vals.len() as u32
+        );
+        gl.buffer_data_with_array_buffer_view(GL::ARRAY_BUFFER, &y_array, GL::DYNAMIC_DRAW);
         gl.draw_elements_with_i32(GL::TRIANGLES, self.index_count, GL::UNSIGNED_SHORT, 0);
 
     }

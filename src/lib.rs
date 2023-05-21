@@ -6,6 +6,7 @@ mod shaders;
 mod programs;
 mod common_funcs;
 mod app_state;
+mod constants;
 
 #[wasm_bindgen]
 extern "C" {
@@ -44,15 +45,15 @@ impl Client {
     pub fn render(&self) -> Result<(), JsValue> {
         self.gl.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
         let curr_state = app_state::get_curr_state();
-        // self._program_color_2d.render(
-        //     &self.gl,
-        //     curr_state.control_bottom,
-        //     curr_state.control_top,
-        //     curr_state.control_left,
-        //     curr_state.control_right,
-        //     curr_state.canvas_height,
-        //     curr_state.canvas_width,
-        // );
+        self._program_color_2d.render(
+            &self.gl,
+            curr_state.control_bottom,
+            curr_state.control_top,
+            curr_state.control_left,
+            curr_state.control_right,
+            curr_state.canvas_height,
+            curr_state.canvas_width,
+        );
         // self.program_color_2d_gradient.render(
         //     &self.gl,
         //     curr_state.control_bottom + 20.,
@@ -70,8 +71,9 @@ impl Client {
             curr_state.control_right - 20.,
             curr_state.canvas_height,
             curr_state.canvas_width,
-            0.5,
-            0.5,
+            curr_state.rotation_angle_x_axis,
+            curr_state.rotation_angle_y_axis,
+            &common_funcs::get_updated_y_values(curr_state.time),
         );
         Ok(())
     }

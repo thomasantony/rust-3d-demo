@@ -165,13 +165,7 @@ pub fn get_3d_projection_matrix(bottom: f32,
     rotation_angle_x_axis: f32, rotation_angle_y_axis: f32)
  -> [f32; 16]
  {
-    const FIELD_OF_VIEW: f32 = 45. * std::f32::consts::PI / 180.; // in radians
-    const Z_NEAR: f32 = 0.1;
-    const Z_FAR: f32 = 100.0;
-
-    // const Z_PLANE: f32 = -1.0 / (FIELD_OF_VIEW/2.0).tan();
-    const Z_PLANE: f32 = -2.414213562373095;
-
+    use crate::constants as c;
     let rotate_x_mat : [f32; 16] = [
         1.0, 0.0, 0.0, 0.0,
         0.0, rotation_angle_x_axis.cos(), -rotation_angle_x_axis.sin(), 0.0,
@@ -196,7 +190,7 @@ pub fn get_3d_projection_matrix(bottom: f32,
     let translate_mat = translation_matrix(
         -1. + scale_x + 2. * left / canvas_width,
         -1. + scale_y + 2. * bottom / canvas_height,
-        Z_PLANE,
+        c::Z_PLANE,
     );
 
     let scale_mat = scaling_matrix(
@@ -208,11 +202,35 @@ pub fn get_3d_projection_matrix(bottom: f32,
     let combined_transform = mult_matrix_4(rotation_scale, translate_mat);
     let perspective_mat_tmp: Perspective3<f32> = Perspective3::new(
         aspect_ratio,
-        FIELD_OF_VIEW,
-        Z_NEAR,
-        Z_FAR,
+        c::FIELD_OF_VIEW,
+        c::Z_NEAR,
+        c::Z_FAR,
     );
     let mut perspective: [f32; 16] = [0.; 16];
     perspective.copy_from_slice(perspective_mat_tmp.as_matrix().as_slice());
     mult_matrix_4(combined_transform, perspective)
- }
+}
+
+pub fn get_updated_y_values(curr_time: f32) -> Vec<f32>
+{
+    use crate::constants as c;
+    let points_per_row = c::GRID_SIZE + 1;
+    let mut y_vals: Vec<f32> = vec![0.; points_per_row * points_per_row];
+    
+    let half_width: f32 = points_per_row as f32 / 2.0;
+    let frequency_scale = 3. * std::f32::consts::PI;
+    let y_scale = 0.15;
+ 
+    for z in 0..points_per_row
+    {
+        for x in 0..points_per_row
+        {
+            let index = z * points_per_row + x;
+            // let frequency_scale = frequency_scale + 0.5 * (curr_time * 0.01);
+            let scaled_x =  frequency_scale * (x as f32 - half_width)/half_width;
+            let scaled_z =  frequency_scale * (z as f32 - half_width)/half_width;
+            y_vals[index] = y_scale * (scaled_x*scaled_x + scaled_z*scaled_z).sqrt().sin();
+        }
+    }
+    y_vals
+}
