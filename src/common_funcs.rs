@@ -1,4 +1,4 @@
-use nalgebra::Perspective3;
+use nalgebra::{Perspective3, Matrix4};
 use web_sys::WebGlRenderingContext as GL;
 use web_sys::*;
 
@@ -156,16 +156,26 @@ pub fn get_position_grid_n_by_n(n: usize) -> (Vec<f32>, Vec<u16>)
     (positions, indices)
 }
 
-pub fn get_3d_projection_matrix(bottom: f32,
+
+pub struct Matrices3D {
+    pub normals_rotation: [f32; 16],
+    pub projection: [f32; 16],
+}
+pub fn get_3d_matrices(bottom: f32,
     top:f32,
     left: f32,
     right: f32,
     canvas_height: f32,
     canvas_width: f32,
     rotation_angle_x_axis: f32, rotation_angle_y_axis: f32)
- -> [f32; 16]
+ -> Matrices3D
  {
     use crate::constants as c;
+    let mut return_var: Matrices3D = Matrices3D {
+        normals_rotation: [0.; 16],
+        projection: [0.; 16],
+    };
+
     let rotate_x_mat : [f32; 16] = [
         1.0, 0.0, 0.0, 0.0,
         0.0, rotation_angle_x_axis.cos(), -rotation_angle_x_axis.sin(), 0.0,
@@ -208,8 +218,25 @@ pub fn get_3d_projection_matrix(bottom: f32,
     );
     let mut perspective: [f32; 16] = [0.; 16];
     perspective.copy_from_slice(perspective_mat_tmp.as_matrix().as_slice());
-    mult_matrix_4(combined_transform, perspective)
+    
+    return_var.projection =  mult_matrix_4(combined_transform, perspective);
+
+// Assign rotation_matrix to normals_rotation
+    let normal_matrix = Matrix4::new(
+        rotation_matrix[0], rotation_matrix[1], rotation_matrix[2], rotation_matrix[3],
+        rotation_matrix[4], rotation_matrix[5], rotation_matrix[6], rotation_matrix[7],
+        rotation_matrix[8], rotation_matrix[9], rotation_matrix[10], rotation_matrix[11],
+        rotation_matrix[12], rotation_matrix[13], rotation_matrix[14], rotation_matrix[15],
+    );
+    match normal_matrix.try_inverse() {
+        Some(inv) => {
+            return_var.normals_rotation.copy_from_slice(inv.as_slice());
+        }, 
+        None => {}
+    };
+    return_var
 }
+
 
 pub fn get_updated_y_values(curr_time: f32) -> Vec<f32>
 {
@@ -218,19 +245,87 @@ pub fn get_updated_y_values(curr_time: f32) -> Vec<f32>
     let mut y_vals: Vec<f32> = vec![0.; points_per_row * points_per_row];
     
     let half_width: f32 = points_per_row as f32 / 2.0;
-    let frequency_scale = 3. * std::f32::consts::PI;
+    let frequency_scale = 2. * std::f32::consts::PI;
     let y_scale = 0.15;
+
+    let sin_offset = curr_time * 0.001;
  
     for z in 0..points_per_row
     {
         for x in 0..points_per_row
         {
             let index = z * points_per_row + x;
-            // let frequency_scale = frequency_scale + 0.5 * (curr_time * 0.01);
+
             let scaled_x =  frequency_scale * (x as f32 - half_width)/half_width;
             let scaled_z =  frequency_scale * (z as f32 - half_width)/half_width;
-            y_vals[index] = y_scale * (scaled_x*scaled_x + scaled_z*scaled_z).sqrt().sin();
+            y_vals[index] = y_scale * ((scaled_x*scaled_x + scaled_z*scaled_z).sqrt() + sin_offset).sin();
         }
     }
     y_vals
+}
+
+pub fn get_grid_normals(grid_size: usize, y_vals: &[f32]) -> Vec<f32>
+{
+    let points_per_row = grid_size + 1;
+    let graph_layout_width: f32 = 2.;
+    let square_size = graph_layout_width / (grid_size as f32);
+    let mut normals: Vec<f32> = vec![0.; points_per_row * points_per_row * 3];
+
+    for i in 0..points_per_row
+    {
+        for j in 0..points_per_row
+        {
+            let y_index_a = i * points_per_row + j;
+            let return_var_start_pos = y_index_a * 3;
+
+            if i == grid_size || j == grid_size
+            {
+                // "up" is the default at the edge ([0, 1, 0])
+                normals[return_var_start_pos + 1] = 1.0;
+            }else{
+                // Get normal vector of triangle defined by three points
+                let y_index_b = y_index_a + points_per_row;  // down
+                let y_index_c = y_index_a + 1;               // right
+
+                let x_val_1 = j as f32 * square_size;
+                let x_val_2 = x_val_1 + square_size;
+
+                let z_val_1 = i as f32 * square_size;
+                let z_val_2 = z_val_1 + square_size;
+                
+                let normal_vec = get_normal_vec(
+                    x_val_1, y_vals[y_index_a], z_val_1,
+                    x_val_1, y_vals[y_index_b], z_val_2,
+                    x_val_2, y_vals[y_index_c], z_val_1,
+                ); 
+                normals[return_var_start_pos] = normal_vec.0;
+                normals[return_var_start_pos + 1] = normal_vec.1;
+                normals[return_var_start_pos + 2] = normal_vec.2;
+            }
+        }
+    }
+    normals
+}
+pub fn get_normal_vec(point_a_x: f32, point_a_y: f32, point_a_z: f32,
+    point_b_x: f32, point_b_y: f32, point_b_z: f32,
+    point_c_x: f32, point_c_y: f32, point_c_z: f32) -> (f32, f32, f32)
+{
+    // Compute normal vector of triangle defined by three points
+    // https://www.khronos.org/opengl/wiki/Calculating_a_Surface_Normal
+    let u_x = point_b_x - point_a_x;
+    let u_y = point_b_y - point_a_y;
+    let u_z = point_b_z - point_a_z;
+    
+    let v_x = point_c_x - point_a_x;
+    let v_y = point_c_y - point_a_y;
+    let v_z = point_c_z - point_a_z;
+
+    // Cross product
+    let normal_x = u_y * v_z - u_z * v_y;
+    let normal_y = u_z * v_x - u_x * v_z;
+    let normal_z = u_x * v_y - u_y * v_x;
+
+    // Normalize
+    let normal_length = (normal_x * normal_x + normal_y * normal_y + normal_z * normal_z).sqrt();
+    (normal_x / normal_length, normal_y / normal_length, normal_z / normal_length)
 }
